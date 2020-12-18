@@ -13,8 +13,17 @@ dt-launchfile-init
 # NOTE: Use `dt-exec COMMAND` to run the main process (blocking process)
 
 # launching app
-dt-exec echo "This is an empty launch script. Update it to launch your application."
+roscore&
+sleep 5
+dt-exec echo "Hallo"
 
+ls packages/my_package/data
+
+pip3 uninstall -y dataclasses
+
+dt-exec Xvfb :1 -screen 0 1024x768x24 -ac +extension GLX +render -noreset
+export DISPLAY=:1
+dt-exec rosrun my_package Test.py
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE
