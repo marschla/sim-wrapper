@@ -27,9 +27,12 @@ class MyPublisherNode(DTROS):
         self.pub_camera_info = rospy.Publisher("fakebot/camera_node/camera_info",CameraInfo,queue_size=1)
 
         #self.pub_lane_pose = rospy.Publisher("fakebot/lane_filter_node/lane_pose",LanePose,queue_size=1)
-        self.pub_lane_pose = rospy.Publisher("fakebot/sim_node/debug_lanepose",LanePose,queue_size=1)
+        #self.pub_lane_pose = rospy.Publisher("fakebot/sim_node/debug_lanepose",LanePose,queue_size=1)
 
-        self.sub = rospy.Subscriber("fakebot/sim_node/actuator_cmd", WheelsCmdStamped, self.callback)
+        #self.sub = rospy.Subscriber("fakebot/sim_node/actuator_cmd", WheelsCmdStamped, self.callback)
+        self.sub = rospy.Subscriber("fakebot/wheels_driver_node/wheels_cmd", WheelsCmdStamped, self.callback)
+        self.sub = rospy.Subscriber("fakebot/lane_filter_node/lane_pose", LanePose, self.callback_pose)
+
 
         self.frame_id = rospy.get_namespace().strip('/') + '/camera_optical_frame'
 
@@ -39,6 +42,10 @@ class MyPublisherNode(DTROS):
     def callback(self,msg):
         self.v_left = msg.vel_left
         self.v_right = msg.vel_right
+
+    def callback_pose(self,msg):
+        pose = [msg.d, msg.phi]
+        rospy.loginfo("pose estimate = %s" % pose)
         
 
     def run(self):
@@ -52,7 +59,7 @@ class MyPublisherNode(DTROS):
             camera_height=480,
             accept_start_angle_deg=4, # start close to straight
             full_transparency=True,
-            distortion=True,
+            distortion=False,
         )
 
         self.bridge = CvBridge()
@@ -75,16 +82,17 @@ class MyPublisherNode(DTROS):
         cam_info.P = calib_data['projection_matrix']['data']
         cam_info.distortion_model = calib_data['distortion_model']
 
-        rate = rospy.Rate(10) # 1Hz
+        rate = rospy.Rate(50) # 1Hz
         while not rospy.is_shutdown():
             
-            action = [self.v_right,self.v_left]
+            action = [self.v_left,self.v_right]
             #rospy.loginfo(action)
             observation, reward, done, misc = env.step(action)
             env.render()
 
+            _observation = cv2.cvtColor(observation, cv2.COLOR_BGR2RGB)
             
-            cmprsmsg = self.bridge.cv2_to_compressed_imgmsg(observation)
+            cmprsmsg = self.bridge.cv2_to_compressed_imgmsg(_observation)
 
             #print(np.shape(observation))
             
@@ -111,15 +119,15 @@ class MyPublisherNode(DTROS):
             #print(lane_pose)
 
             pose = [lane_pose.dist,lane_pose.angle_rad]
-            rospy.loginfo(pose)
+            rospy.loginfo("real pose = %s" % pose)
 
-            
+            '''
             pose_msg = LanePose()
             pose_msg.d = lane_pose.dist
             pose_msg.phi = lane_pose.angle_rad
             pose_msg.header.stamp = rospy.Time.now()
             self.pub_lane_pose.publish(pose_msg)
-            
+            '''
 
             if done:
                 env.reset()
