@@ -11,7 +11,7 @@ import numpy as np
 import cv2
 from cv_bridge import CvBridge
 
-from sensor_msgs.msg import CompressedImage, CameraInfo
+from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 
 import gym_duckietown
 from gym_duckietown.simulator import Simulator
@@ -26,7 +26,9 @@ class MyPublisherNode(DTROS):
 
         self.pub_camera_info = rospy.Publisher("fakebot/camera_node/camera_info",CameraInfo,queue_size=1)
 
-        #self.pub_lane_pose = rospy.Publisher("fakebot/lane_filter_node/lane_pose",LanePose,queue_size=1)
+        #self.pub_full_img = rospy.Publisher("fakebot/test",Image,queue_size=1)
+
+        #self.pub_lane_pose = rospy.Publisher("fakebot/sim_pose/lane_pose",LanePose,queue_size=1)
         #self.pub_lane_pose = rospy.Publisher("fakebot/sim_node/debug_lanepose",LanePose,queue_size=1)
 
         #self.sub = rospy.Subscriber("fakebot/sim_node/actuator_cmd", WheelsCmdStamped, self.callback)
@@ -39,13 +41,15 @@ class MyPublisherNode(DTROS):
         self.v_left = 0
         self.v_right = 0
 
+        self.pose_est = [0,0]
+
     def callback(self,msg):
         self.v_left = msg.vel_left
         self.v_right = msg.vel_right
 
     def callback_pose(self,msg):
-        pose = [msg.d, msg.phi]
-        rospy.loginfo("pose estimate = %s" % pose)
+        self.pose_est = [msg.d, msg.phi]
+        rospy.loginfo("pose estimate = %s" % self.pose_est)
         
 
     def run(self):
@@ -59,7 +63,7 @@ class MyPublisherNode(DTROS):
             camera_height=480,
             accept_start_angle_deg=4, # start close to straight
             full_transparency=True,
-            distortion=False,
+            distortion=True,
         )
 
         self.bridge = CvBridge()
@@ -91,6 +95,9 @@ class MyPublisherNode(DTROS):
             env.render()
 
             _observation = cv2.cvtColor(observation, cv2.COLOR_BGR2RGB)
+
+            #full_img_msg = self.bridge.cv2_to_imgmsg(observation, encoding="rgb8")
+            #self.pub_full_img.publish(full_img_msg)
             
             cmprsmsg = self.bridge.cv2_to_compressed_imgmsg(_observation)
 
@@ -117,10 +124,12 @@ class MyPublisherNode(DTROS):
             
             lane_pose = env.get_lane_pos2(env.cur_pos, env.cur_angle)
             #print(lane_pose)
-
+            
             pose = [lane_pose.dist,lane_pose.angle_rad]
             rospy.loginfo("real pose = %s" % pose)
-
+            error = [pose[0]-self.pose_est[0], pose[1] + self.pose_est[1]]
+            rospy.loginfo("error = %s" % error)
+            
             '''
             pose_msg = LanePose()
             pose_msg.d = lane_pose.dist
