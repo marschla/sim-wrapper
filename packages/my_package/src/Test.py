@@ -4,7 +4,7 @@ import os
 import rospy
 from duckietown.dtros import DTROS, NodeType, TopicType
 from std_msgs.msg import String
-from duckietown_msgs.msg import WheelsCmdStamped, LanePose, Twist2DStamped
+from duckietown_msgs.msg import WheelsCmdStamped, LanePose, Twist2DStamped, Pose2DStamped
 import yaml
 
 import numpy as np
@@ -22,18 +22,19 @@ class MyPublisherNode(DTROS):
         # initialize the DTROS parent class
         super(MyPublisherNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
         
+        #setting up ros publisher
+        #Publisher for simulated camera image
         self.pub_img = rospy.Publisher("fakebot/camera_node/image/compressed",CompressedImage, queue_size=1)
-
+        #Publisher for camera info
         self.pub_camera_info = rospy.Publisher("fakebot/camera_node/camera_info",CameraInfo,queue_size=1)
+        #Publisher for global pose of Duckiebot
+        self.pub_global_pose = rospy.Publisher("fakebot/global_pose",Pose2DStamped,queue_size=1)
 
-        #self.pub_full_img = rospy.Publisher("fakebot/test",Image,queue_size=1)
-
-        #self.pub_lane_pose = rospy.Publisher("fakebot/sim_pose/lane_pose",LanePose,queue_size=1)
-        #self.pub_lane_pose = rospy.Publisher("fakebot/sim_node/debug_lanepose",LanePose,queue_size=1)
-
-        #self.sub = rospy.Subscriber("fakebot/sim_node/actuator_cmd", WheelsCmdStamped, self.callback)
-        self.sub = rospy.Subscriber("fakebot/wheels_driver_node/wheels_cmd", WheelsCmdStamped, self.callback)
-        self.sub = rospy.Subscriber("fakebot/lane_filter_node/lane_pose", LanePose, self.callback_pose)
+        #setting up ros Subscriber
+        #Subscriber to receive wheel commands from the controller / dt-core
+        self.sub = rospy.Subscriber("fakebot/wheels_driver_node/wheels_cmd", WheelsCmdStamped, self.callback,queue_size=1)
+        #Subscriber to receive estimated lane pose from the lane filter for debug purposes
+        self.sub = rospy.Subscriber("fakebot/lane_filter_node/lane_pose", LanePose, self.callback_pose,queue_size=1)
 
 
         self.frame_id = rospy.get_namespace().strip('/') + '/camera_optical_frame'
@@ -43,17 +44,20 @@ class MyPublisherNode(DTROS):
 
         self.pose_est = [0,0]
 
+    #stores received wheel commands to be used for simulator input
     def callback(self,msg):
         self.v_left = msg.vel_left
         self.v_right = msg.vel_right
 
+    #prints estimated lane pose for debug purposes
     def callback_pose(self,msg):
         self.pose_est = [msg.d, msg.phi]
         rospy.loginfo("pose estimate = %s" % self.pose_est)
         
 
     def run(self):
-
+        
+        #setting up simulator environment
         env = Simulator(
             seed=123, # random seed
             map_name="small_loop",
@@ -70,10 +74,12 @@ class MyPublisherNode(DTROS):
 
         image_msg = CompressedImage()
 
+        #calibration file to get camera info parameters 
         cali_file_folder = '/data/config/calibrations/camera_intrinsic/'
 
         filename = cali_file_folder + rospy.get_namespace().strip("/") + "default.yaml"
 
+        #loading camera info and storing it in a sensor_msg
         with open(filename, 'r') as stream:
             calib_data = yaml.load(stream)
 
@@ -86,23 +92,26 @@ class MyPublisherNode(DTROS):
         cam_info.P = calib_data['projection_matrix']['data']
         cam_info.distortion_model = calib_data['distortion_model']
 
-        rate = rospy.Rate(50) # 1Hz
+        #main loop that runs the simulator
+        rate = rospy.Rate(20) # 1Hz
         while not rospy.is_shutdown():
             
+            #feed actuator commands to simulator and simulate for one step -> receive camera image
             action = [self.v_left,self.v_right]
             #rospy.loginfo(action)
             observation, reward, done, misc = env.step(action)
             env.render()
 
+            #converting image to correct representation
             _observation = cv2.cvtColor(observation, cv2.COLOR_BGR2RGB)
 
             #full_img_msg = self.bridge.cv2_to_imgmsg(observation, encoding="rgb8")
             #self.pub_full_img.publish(full_img_msg)
             
+            #converting cv2 image to ros msg
             cmprsmsg = self.bridge.cv2_to_compressed_imgmsg(_observation)
 
-            #print(np.shape(observation))
-            
+            #setting up img msg, then publish it to the relevant nodes
             image_msg = cmprsmsg
 
             image_msg.format = "jpeg"
@@ -110,32 +119,39 @@ class MyPublisherNode(DTROS):
             image_msg.header.stamp = stamp
             image_msg.header.frame_id = self.frame_id
 
-            #print(len(image_msg.format))
-            #print(len(image_msg.data))
-            #print(len(image_msg.header.frame_id))
-            #print("--------------------------------------------------")
-
             self.pub_img.publish(image_msg)
 
+            #publishing cam info msg 
             cam_info.header.stamp = stamp
 
             self.pub_camera_info.publish(cam_info)
+
+            rospy.loginfo(env.cur_angle)
             
+            #create msg with global position of DB, so position on the map, then publish it, for evaluation purposes
+            global_pose_msg = Pose2DStamped()
+            global_pose_msg.header.stamp = rospy.Time.now()
+            global_pose_msg.x = env.cur_pos[0]
+            global_pose_msg.y = env.cur_pos[2]
+            global_pose_msg.theta = env.cur_angle
+
+            self.pub_global_pose.publish(global_pose_msg)
             
+
+            '''
             lane_pose = env.get_lane_pos2(env.cur_pos, env.cur_angle)
-            #print(lane_pose)
             
             pose = [lane_pose.dist,lane_pose.angle_rad]
             rospy.loginfo("real pose = %s" % pose)
             error = [pose[0]-self.pose_est[0], pose[1] + self.pose_est[1]]
             rospy.loginfo("error = %s" % error)
             
-            '''
+            
             pose_msg = LanePose()
             pose_msg.d = lane_pose.dist
             pose_msg.phi = lane_pose.angle_rad
             pose_msg.header.stamp = rospy.Time.now()
-            self.pub_lane_pose.publish(pose_msg)
+            self.pub_real_pose(pose_msg)
             '''
 
             if done:
