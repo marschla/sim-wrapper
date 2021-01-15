@@ -18,7 +18,7 @@ sleep 5
 dt-exec echo "Hallo"
 
 ls packages/
-cp packages/maps/marco_1.yaml /usr/local/lib/python3.8/dist-packages/duckietown_world/data/gd1/maps
+cp -a packages/maps/. /usr/local/lib/python3.8/dist-packages/duckietown_world/data/gd1/maps
 
 pip3 uninstall -y dataclasses
 

@@ -27,10 +27,12 @@ class MyPublisherNode(DTROS):
         self.pub_img = rospy.Publisher("fakebot/camera_node/image/compressed",CompressedImage, queue_size=1)
         #Publisher for camera info
         self.pub_camera_info = rospy.Publisher("fakebot/camera_node/camera_info",CameraInfo,queue_size=1)
-        #Publisher for global pose of Duckiebot
-        self.pub_global_pose = rospy.Publisher("fakebot/sim_node/global_pose",Pose2DStamped,queue_size=1)
         #Publisher of real lane pose to bypass malfunctioning lane filter
         self.pub_lane_pose = rospy.Publisher("fakebot/sim_node/lane_pose",LanePose,queue_size=1)
+        #Publisher for global pose of Duckiebot, to evaluate trajectory
+        self.pub_global_pose = rospy.Publisher("fakebot/sim_node/global_pose",Pose2DStamped,queue_size=1)
+        #Publisher of actuator output
+        self.pub_car_cmd = rospy.Publisher("fakebot/sim_node/actuator_cmd",WheelsCmdStamped,queue_size=1)
 
         #setting up ros Subscriber
         #Subscriber to receive wheel commands from the controller / dt-core
@@ -62,7 +64,7 @@ class MyPublisherNode(DTROS):
         #setting up simulator environment
         env = Simulator(
             seed=123, # random seed
-            map_name="marco_1",
+            map_name="marco_straight",
             max_steps=500001, # we don't want the gym to reset itself
             domain_rand=0,
             camera_width=640,
@@ -125,13 +127,17 @@ class MyPublisherNode(DTROS):
             #publishing cam info msg 
             cam_info.header.stamp = stamp
             self.pub_camera_info.publish(cam_info)
+
+            stamp = rospy.Time.now()
             
             #create msg with global position of DB, so position on the map, then publish it, for evaluation purposes
             global_pose_msg = Pose2DStamped()
-            global_pose_msg.header.stamp = rospy.Time.now()
+            global_pose_msg.header.stamp = stamp
             global_pose_msg.x = env.cur_pos[0]
             global_pose_msg.y = env.cur_pos[2]
             global_pose_msg.theta = env.cur_angle
+
+            rospy.loginfo(global_pose_msg.x)
 
             self.pub_global_pose.publish(global_pose_msg)
                        
@@ -139,8 +145,15 @@ class MyPublisherNode(DTROS):
             pose_msg = LanePose()
             pose_msg.d = lane_pose.dist
             pose_msg.phi = lane_pose.angle_rad
-            pose_msg.header.stamp = rospy.Time.now()
+            pose_msg.header.stamp = stamp
             self.pub_lane_pose.publish(pose_msg)
+
+            actuator_msg = WheelsCmdStamped()
+            actuator_msg.header.stamp = stamp
+            actuator_msg.vel_left = self.v_left
+            actuator_msg.vel_right = self.v_right
+
+            self.pub_car_cmd.publish(actuator_msg)
             
 
             if done:
