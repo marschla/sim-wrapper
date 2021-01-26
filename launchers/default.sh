@@ -24,8 +24,9 @@ pip3 uninstall -y dataclasses
 
 dt-exec Xvfb :1 -screen 0 1024x768x24 -ac +extension GLX +render -noreset
 export DISPLAY=:1
-dt-exec rosrun my_package Test.py 
+#dt-exec rosrun my_package Test.py 
 #dt-exec rosrun my_package Segment_debug.py
+dt-exec roslaunch my_package wrapper.launch
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE

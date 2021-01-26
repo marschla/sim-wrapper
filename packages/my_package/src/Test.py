@@ -64,7 +64,7 @@ class MyPublisherNode(DTROS):
         #setting up simulator environment
         env = Simulator(
             seed=123, # random seed
-            map_name="marco_straight",
+            map_name="marco_1",
             max_steps=500001, # we don't want the gym to reset itself
             domain_rand=0,
             camera_width=640,
@@ -97,7 +97,7 @@ class MyPublisherNode(DTROS):
         cam_info.distortion_model = calib_data['distortion_model']
 
         #main loop that runs the simulator
-        rate = rospy.Rate(20) # 1Hz
+        rate = rospy.Rate(20) # 20Hz
         while not rospy.is_shutdown():
             
             #feed actuator commands to simulator and simulate for one step -> receive camera image
