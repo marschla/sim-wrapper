@@ -12,4 +12,4 @@ Contains the docker image for the Duckietown Simulator Wrapper.
  docker run -it --rm --net=host -v /PATH_TO_CALI_FILE:/data -e duckietown/sim-wrapper:v2-amd64
 ```
 
-The Calibration file are more information can be found here: https://docs.duckietown.org/daffy/duckietown-robotics-development/out/duckietown_simulation.html
+The Calibration file and more information can be found here: https://docs.duckietown.org/daffy/duckietown-robotics-development/out/duckietown_simulation.html
