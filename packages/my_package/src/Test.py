@@ -40,7 +40,6 @@ class MyPublisherNode(DTROS):
         #Subscriber to receive estimated lane pose from the lane filter for debug purposes
         #self.sub = rospy.Subscriber("fakebot/lane_filter_node/lane_pose", LanePose, self.callback_pose,queue_size=1)
 
-
         self.frame_id = rospy.get_namespace().strip('/') + '/camera_optical_frame'
 
         self.v_left = 0
@@ -64,7 +63,7 @@ class MyPublisherNode(DTROS):
         #setting up simulator environment
         env = Simulator(
             seed=123, # random seed
-            map_name="marco_1",
+            map_name="marco_small",
             max_steps=500001, # we don't want the gym to reset itself
             domain_rand=0,
             camera_width=640,
@@ -137,16 +136,23 @@ class MyPublisherNode(DTROS):
             global_pose_msg.y = env.cur_pos[2]
             global_pose_msg.theta = env.cur_angle
 
-            rospy.loginfo(global_pose_msg.x)
+            #rospy.loginfo(global_pose_msg.x)
 
             self.pub_global_pose.publish(global_pose_msg)
                        
-            lane_pose = env.get_lane_pos2(env.cur_pos, env.cur_angle)          
+            lane_pose = env.get_lane_pos2(env.cur_pos, env.cur_angle)       
             pose_msg = LanePose()
             pose_msg.d = lane_pose.dist
             pose_msg.phi = lane_pose.angle_rad
             pose_msg.header.stamp = stamp
+            rospy.loginfo(pose_msg.d)   
             self.pub_lane_pose.publish(pose_msg)
+
+            
+            if np.abs(pose_msg.d) > 0.11:
+                #done = True
+                rospy.logwarn("Crash")
+            
 
             actuator_msg = WheelsCmdStamped()
             actuator_msg.header.stamp = stamp
@@ -157,7 +163,9 @@ class MyPublisherNode(DTROS):
             
 
             if done:
-                env.reset()
+                rospy.logwarn("The robot crashed")
+                return 0
+                
 
             rate.sleep()
 

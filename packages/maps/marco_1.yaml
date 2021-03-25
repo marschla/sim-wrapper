@@ -8,6 +8,6 @@ tiles:
 - [asphalt,asphalt,curve_left/S,straight/E,straight/E,straight/E,curve_left/E]
 
 start_tile: [3,0]
-start_pose: [[0.250, 0, 0.17], 3.141]
+start_pose: [[0.250, 0, 0.17], 3.141] #0.17
 
 tile_size: 0.585

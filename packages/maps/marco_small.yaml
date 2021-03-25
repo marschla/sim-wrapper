@@ -1,0 +1,12 @@
+tiles:
+- [curve_left/W, straight/W,curve_left/N]
+- [straight/S,asphalt,straight/N]
+- [curve_left/S,straight/E,curve_left/E]
+
+start_tile: [1,0]
+start_pose: [[0.4, 0, 0.17], 3.141] #0.17
+
+#start_tile: [1,0]
+#start_pose: [[0.1, 0, 0.415], 0]
+
+tile_size: 0.585
